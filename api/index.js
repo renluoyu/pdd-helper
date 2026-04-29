@@ -1,60 +1,73 @@
-// 在内存中存储助力码（重启会丢失，生产环境建议用数据库）
-let storage = [
-  { code: "8602346660", date: "04/29 08:52", used: false, timestamp: Date.now() - 100000 },
-  { code: "8612344478", date: "04/29 08:46", used: true, timestamp: Date.now() - 200000 },
-  { code: "8562344880", date: "04/29 08:43", used: false, timestamp: Date.now() - 300000 }
-];
+// api/index.js
+// ✅ Vercel Serverless Function 入口文件（必须导出默认函数）
+// ⚠️ 注意：Vercel 的 Edge Functions 不支持 localStorage，此处用内存变量模拟（仅限单实例测试）
+// 生产环境请改用 Vercel KV 或数据库（如 Supabase）
+
+// 初始化一个内存存储（⚠️ 重启后清空，仅用于演示）
+let storage = [];
 
 export default async function handler(req, res) {
-  // 设置 CORS 头部（允许跨域请求）
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  try {
+    // 1. 解析请求方法和路径
+    const { method } = req;
+    const url = new URL(req.url, 'https://example.com'); // 构造完整 URL
+    const path = url.pathname;
 
-  // 处理预检请求
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
+    // 2. 提取助力码：从路径末尾获取（如 /api/ABCDE）
+    const code = path.split('/').filter(p => p).pop(); // 取最后一个非空段
 
-  // GET 请求：获取助力码列表
-  if (req.method === 'GET') {
-    const sorted = [...storage].sort((a, b) => b.timestamp - a.timestamp);
-    return res.status(200).json({ codes: sorted.slice(0, 20) }); // 返回最新20条
-  }
-
-  // POST 请求：提交新的助力码
-  if (req.method === 'POST') {
-    const { code, date, timestamp } = req.body;
-    
-    // 检查是否已存在
-    if (storage.some(c => c.code === code)) {
-      return res.status(400).json({ error: '该助力码已存在' });
+    // 3. 处理 GET 请求（可选：用于调试）
+    if (method === 'GET') {
+      return res.status(200).json({
+        message: 'PDD Helper API',
+        total: storage.length,
+        codes: storage.map(c => c.code)
+      });
     }
 
-    // 添加新记录
-    storage.unshift({ code, date, used: false, timestamp });
-    
-    // 限制最多20条
-    if (storage.length > 20) storage.pop();
-    
-    return res.status(200).json({ success: true });
-  }
+    // 4. 处理 POST/PUT 请求（核心逻辑）
+    if (method === 'POST' || method === 'PUT') {
+      // 尝试解析 JSON body（Vercel 自动处理）
+      let body = {};
+      try {
+        body = await req.json();
+      } catch (e) {
+        // 如果不是 JSON，尝试用 text()
+        body = await req.text();
+        if (body) {
+          try {
+            body = JSON.parse(body);
+          } catch {}
+        }
+      }
 
-  // PUT 请求：更新助力码状态（跳转→已使用）
-  if (req.method === 'PUT') {
-    const urlParts = req.url.split('/');
-    const code = urlParts[urlParts.length - 1]; // 从 URL 中提取助力码
-    const { used } = req.body;
-    
-    const index = storage.findIndex(c => c.code === code);
-    if (index !== -1) {
-      storage[index].used = used;
-      storage[index].timestamp = Date.now(); // 更新时间戳
+      // 5. 检查是否已存在
+      if (storage.some(c => c.code === code)) {
+        return res.status(400).json({ error: '该助力码已存在' });
+      }
+
+      // 6. 添加新记录
+      const newEntry = {
+        code,
+        date: new Date().toISOString(),
+        used: Boolean(body.used || false),
+        timestamp: Date.now()
+      };
+      storage.unshift(newEntry);
+
+      // 7. 限制最多 20 条
+      if (storage.length > 20) {
+        storage.pop();
+      }
+
+      return res.status(200).json({ success: true, code: newEntry.code });
     }
-    
-    return res.status(200).json({ success: true });
-  }
 
-  // 其他方法返回错误
-  res.status(405).json({ error: 'Method not allowed' });
+    // 8. 其他方法返回 405
+    return res.status(405).json({ error: 'Method Not Allowed' });
+
+  } catch (error) {
+    console.error('API Error:', error);
+    return res.status(500).json({ error: 'Internal Server Error', details: error.message });
+  }
 }
