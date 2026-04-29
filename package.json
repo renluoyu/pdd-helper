@@ -1,7 +1,16 @@
 {
-  "name": "pdd-helper",
+  "name": "pdd-helper-api",
   "version": "1.0.0",
+  "description": "PDD Helper API on Vercel",
+  "main": "api/index.js",
+  "scripts": {
+    "dev": "node api/index.js"
+  },
+  "keywords": ["vercel", "api", "pdd", "helper"],
+  "author": "Your Name",
+  "license": "MIT",
   "dependencies": {
-    "node-fetch": "^2.6.7"
+    "cors": "^2.8.5",
+    "express": "^4.18.2"
   }
 }
