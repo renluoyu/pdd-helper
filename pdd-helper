@@ -1,0 +1,11 @@
+{
+  "name": "pdd-helper",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "vercel dev",
+    "build": "vercel build"
+  },
+  "dependencies": {
+    "node-fetch": "^2.6.7"
+  }
+}
